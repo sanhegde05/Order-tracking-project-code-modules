@@ -1,0 +1,34 @@
+"""
+Reads text from a scanned/ image format pdf using OCR (Optical Character Recognition) technology
+"""
+
+
+import fitz
+import easyocr
+from PIL import Image 
+
+to_read_pdf="path of the pdf file"
+imagetext=""
+pdf_file = fitz.open(to_read_pdf)
+for page_index in range (0,len(pdf_file)):
+	print("Reading Page: "+ str(page_index+1)+" ,Please wait!!")
+	page = pdf_file[page_index]
+	zoom = 4
+	mat = fitz.Matrix(zoom, zoom)
+
+	val = f"PdfPages.png"                                #image path where the pages to be stored (one by one page, overwrites the screenshot)
+	page = pdf_file.load_page(page_index)
+	pix = page.get_pixmap(matrix=mat)
+	pix.save(val)                 # saving pdf pages as image                        #saving the image
+
+	IMAGE_PATH = 'PdfPages.png'   # reading the saved image
+	reader1 = easyocr.Reader(['en'])
+	result = reader1.readtext(IMAGE_PATH)
+    
+
+	imagetext=""
+	for i in range(len(result)):
+		imagetext+=result[i][1]+" "        #here the index 1 will be text, 0 will be coordinates, and 2 will be accuracy                    #extract only the strings which is present in the 1st position
+		#print(result)                     #uncomment this to understand the above line clearly
+	
+print(imagetext)
