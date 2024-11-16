@@ -1,0 +1,64 @@
+'''
+Sending emails with attachments using SMTP and pyhton 
+'''
+
+from glob import glob
+import psycopg2
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
+from email.message import EmailMessage
+from email.utils import formataddr
+from pathlib import Path
+
+sender = "<your_email@domain.com>"
+reciever = "<receiver_email_1@domain.com>;<receiver_email_2@domain.com>"
+
+# Creating message container - the correct MIME type is multipart/alternative.
+msg = MIMEMultipart('alternative')
+msg['Subject'] = "<Your Subject line for the email>"
+msg['From'] = sender
+msg['To'] = receiver
+msg['cc'] = ""
+
+
+html6= """<html><head></head>
+<body>
+Email body to be sent
+</body></html>
+"""
+
+
+#---------------- if you want to attach more than 1 attachments from a directory "local_dir" to the email
+# local_dir="path from where the attachments present"
+# files= glob(local_dir)
+# for f in files:  # add files to the message
+#         file_path = os.path.join(local_dir, f)
+#         attachment = MIMEApplication(
+#             open(file_path, "rb").read(), _subtype="txt")
+#         attachment.add_header('Content-Disposition', 'attachment', filename=f)
+#         # attaching documents to my mail
+#         msg.attach(attachment)
+
+
+#---------------- if you want to attach only 1 attachments from a directory
+file_path ="<path for the file>"
+attachment = MIMEApplication(open(file_path, "rb").read(), _subtype="txt")
+attachment.add_header('Content-Disposition', 'attachment', filename='<name of the attachmet>')
+# attaching documents to my mail
+msg.attach(attachment)
+
+htmlf=html6
+part = MIMEText(htmlf, 'html')
+msg.attach(part)
+
+fromaddr = sender
+toaddrs = [reciever] + cc
+server = smtplib.SMTP('<SMTP address>',<SMTP port number>)      #ex: ('SMTP.na.abccompany.com',25)    #this port number may differ for organizations
+server.set_debuglevel(1)
+server.sendmail(fromaddr, toaddrs, msg.as_string())
+server.quit()
+print("Successfully sent email")
