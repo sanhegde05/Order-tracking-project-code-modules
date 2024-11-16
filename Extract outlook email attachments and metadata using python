@@ -1,0 +1,105 @@
+#save email data and attachments
+"""
+save_email_attachments is a function that saves email metadata and attachments from an email account based on a date range.
+"""
+
+import win32com.client
+import datetime
+from datetime import datetime
+from datetime import timedelta
+import pandas as pd
+import os
+ 
+source="path of the directory, where the email data to be stored"
+
+#====================== To read the email from primary email account
+Outlook = win32com.client.Dispatch("Outlook.Application")     
+olNs = Outlook.GetNamespace("MAPI")
+shared_inbox = olNs.GetDefaultFolder(6)                     #6 = inbox
+
+#====================== To read the email from secondary email in the outlook
+#Outlook = win32com.client.Dispatch("Outlook.Application")
+#olNs = Outlook.GetNamespace("MAPI")
+#Recip = olNs.CreateRecipient("<Secondary_email@domain>.com")
+#Recip.Resolve()
+#shared_inbox = olNs.GetSharedDefaultFolder(Recip, "6")
+
+
+#====================== to make the email reading with dynamic time use this part of code. To read emails for a particular time range, use the below code
+# assume DF as a dataframe read from Final SQL table where all the Emaildata saves, and 'Email Received Time' is column in SQL where the email received   
+end_date = str(max(DF['Email Received Time']) + timedelta(minutes = 1))         #adding a minute to exclude running the same email again and to remove dupliacate entries 
+end_date = end_date.replace('.000','').replace('\n','').replace('+00:00','')
+end_date = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S').strftime('%m/%d/%Y %H:%M %p')
+start_date=str(datetime.now())
+start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S.%f').strftime('%m/%d/%Y %H:%M %p')
+
+
+#====================== if you want to try a timeframe (for testing), uncomment below code and comment above start and end date lines
+#change the start and end dates (YYYY-MM-DD HH:MM:SS.000000+00:00)
+#start_date="2022-12-31 23:59:00.000000+00:00"
+#start_date = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S.%f+00:00').strftime('%m/%d/%Y %H:%M %p')
+#end date must be the max of all the email read from the dataframe
+#end_date="2023-03-29 20:30:00.000000+00:00"
+#end_date = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S.%f+00:00').strftime('%m/%d/%Y %H:%M %p')
+
+print("start time of emails: " +str(start_date))
+print("end time of emails: "+str(end_date))
+
+
+#restrincting email reading from last read to today's date
+messages = shared_inbox.Items.Restrict("[SentOn] < '" + start_date + "'"+ " and " + "[SentOn] > '" + end_date + "'")
+for message in messages:
+	if message.MessageClass == 'IPM.Outlook.Recall':          #to resolve the error of recalled emails (code used to get struck to recalled emails which were not deleted from inbox)
+		print("Recalled message: " +str(message.subject))
+		
+	else:
+		#read emails having particular "keyword" conditions if you want to read all emails, remove if condition
+		if (<keyword> in str(message.subject):
+			try:
+				print("Email subject: "+str(message.subject))
+				print("Email Recived time: "+str(message.SentOn))
+			except Exception as e:
+				print("Error while reading email subject and time: " + str(e))
+			
+			#here we are saving individual email metadata and attachments in the folders with the time stamp in source folder
+			try:
+				abc= str(message.SentOn.strftime('%m_%d_%Y %H-%M-%S'))   #converting datetime to string
+				outputDir = source+abc    
+				os.mkdir(outputDir)                                      #creating a folder with the email's timestamp
+			except Exception as e:
+				print("Error while creating the folders: " + str(e))
+			
+			#here we are saving the actual email also for validation purposes
+			try:
+				name = 'Actual_email.msg'
+				message.SaveAs(outputDir+'//'+name)   #saving the actual email for the testing and auditing
+			except Exception as e:
+				print("Error while saving the actual email in the directory: " + str(e))
+
+			#here we are saving email metadatas like email received time, Message ID, Body, subject for future purpose in "email_metadata.txt" file
+			try:
+				# Create the email details text file
+				email_metadata = os.path.join(outputDir, "email_Metadata.txt")    #creating an email metadata file which contains msgID, recTime, subject and EmailBody
+				with open(email_metadata, "w",encoding="utf-8") as f:
+					# Write Message ID, Email Received time, subject line and content of the body to the text file
+					f.write("Message ID: " + str(message.EntryID) + "\n")
+					f.write("Received time: " + str(message.SentOn) + "\n")
+					f.write("Subject: " + str(message.Subject) + "\n")
+					f.write("Content: " + str(message.Body) + "\n")
+					f.close()		
+			except Exception as e:
+				print("Error While saving the email details in email_Metadata.txt file: " + str(e))
+			
+			
+			#here we are saving all the attachments to the particular folder in source folder
+			try:    
+				print("Saving attachments!!!")
+				for attachment in message.Attachments:
+					#to save all attachments including .png files (usually the signature part of the email also considered as attachment) this condition is to remove that
+					if ".png" not in str(attachment):   
+						attachment.SaveASFile(os.path.join(outputDir, attachment.FileName))   #saving attachments 
+			except Exception as e:
+				logging.info("Error while saving the attachment:" + str(e))
+				print("Error while saving the attachment:" + str(e))
+			print("--------------------------------------")
+
