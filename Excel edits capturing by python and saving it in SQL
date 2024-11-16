@@ -1,0 +1,102 @@
+'''
+This function tracks all the changes made to an excel with who, why and when they edited the record. Tracking the edits can be done using SQL server data.
+
+Assumne there is a master SQL table which has all the previously edited data and also the newest data which is edited. An excel is in some shared folder where 'Edited By' is a cumpolsory column to filled(based on this only we are tracking in which record anyone made changes)
+Editable tracker has only the latest record(edited record) and history record is present only in the SQL table. Which is tracked by the column 'Flag'. If 1 is there, it is latest and if it is 0, then it is already edited.
+'''
+#!/usr/bin/env python
+# coding: utf-8
+
+#importing required modules
+import pandas as pd
+import pyodbc
+import pandas as pd
+import urllib
+from urllib.parse import urlparse
+import sqlalchemy
+from sqlalchemy import create_engine
+
+
+#read data from SQL
+# Create a SQL Alchemy Engine to desired server/database
+params = urllib.parse.quote_plus(r'DRIVER={SQL Server Native Client 11.0};SERVER=<Server name>;DATABASE=<database name>;Trusted_Connection=yes')
+conn_str = 'mssql+pyodbc:///?odbc_connect={}'.format(params)
+engine = create_engine(conn_str, fast_executemany=True)
+Master_table= pd.read_sql('SELECT * from <Table name>', conn_str)
+master_backup= Master_table
+
+
+#reading the editable excel file 
+edited_tracker = pd.read_excel(r'<excel file path.xlsx>')
+#edited_tracker.set_index("<coulumn name>",drop=True,inplace=True)    #if you want to set any column as the index 
+
+#we want only changed rows 
+#'Edited By' should be filled and is a compulsory field to check if any changes made on the particular record (in our used case, and also informed the same to the team)
+edited_tracker = edited_tracker.dropna(subset=['Edited By'], axis=0)    #there is a column 'Edited By' in excel and it is mandatory field to capture if any data is modified
+edited_tracker
+
+#checking if is there any changes to previous day
+if len(edited_tracker)==0:
+    print("nothing changed to previous day")
+else:
+    print("changes present, proceeding to next steps")
+    from datetime import datetime, timedelta
+	
+	#here, 'Edited By','Reason' are fields which the editor should fill in the Excel. 'Last Edited By', 'Last Edited Reason' and 'Last edited date' are for the purpose of backtracking who made the changes and when
+	#You can change according to the requirement
+    edited_tracker['Last Edited By']=edited_tracker['Edited By']
+    edited_tracker['Last Edited reason']=edited_tracker['Reason']
+    edited_tracker['Last Edited date']=datetime.strptime(str(datetime.now()), '%Y-%m-%d %H:%M:%S.%f').strftime('%m/%d/%Y')
+    edited_tracker['Edited By']=""
+    edited_tracker['Reason']=""
+    edited_tracker["Flag"]=1     #Latest values are with flag 1 and we are keeping only the latest record and edited record will only be present in the SQL tables and not in the Excels
+    
+	#adding the edited rows to the master table
+    Master_table=pd.concat([Master_table, edited_tracker], axis=0)
+    Master_table.drop_duplicates(inplace=True)
+    Master_table.reset_index(inplace=True, drop= True)
+    
+    edited_indexes=edited_tracker.index.array
+    edited_indexes
+    temp_list=[]
+    for i in edited_indexes:
+        if i in master_backup.index.array:
+		#updating the last edited details in master table too for the backtracking of the edits
+            Master_table.loc[i,'Last Edited By']=edited_tracker.loc[i,'Last Edited By']
+            Master_table.loc[i,'Last Edited reason']=edited_tracker.loc[i,'Last Edited reason']
+            Master_table.loc[i,'Last Edited date']=edited_tracker.loc[i,'Last Edited date']
+            Master_table.loc[i,'Flag']=0      #convering the flag to 0 for the edited records (old records)
+        else:
+            temp_list.append(i)
+			
+	#writing data to SQL and Excels		
+    try:
+        print("Writing Editable_Master to server")  # Uploading the final dataframe to SQL table
+        Master_table.to_sql(con=engine.connect(),name='<SQL table name(Editable_Master)>',if_exists='replace',index=False,chunksize=1000 )
+        print("Successfully loaded Editable_Master")
+    except:
+        print("MASTER updation failed !!!!!!")
+        print("editable_tracker task failed !!!!!!")
+        print("close the MASTER excel !!!!!!")
+
+    try:
+        print("Writing Excel_Current_version to server")   # Uploading the final dataframe to SQL table
+        editable_tracker.to_sql(con=engine.connect(),name='<SQL table name(Excel_Current_version)>',if_exists='replace',index=False,chunksize=1000 )
+        print("Successfully loaded Excel_Current_version")
+        editable_tracker.drop(['Last Edited By','Last Edited reason','Last Edited date'], inplace=True, axis=1)
+        editable_tracker.to_excel(r'<excel file path.xlsx>')
+
+    except:
+        print("editable tracker file updation failed !!!!!! uploading the backup")
+        print("Writing Editable_Master backup to server")# Uploading the backup dataframe to SQL table
+        master_backup.to_sql(con=engine.connect(),name='SQL table name(Editable_Master)',if_exists='replace',index=False,chunksize=1000 )
+        editable_tracker= master_backup[master_backup['Flag']==1]
+        print("Writing Excel_Current_version backup to server")# Uploading the final dataframe to SQL table
+        editable_tracker.to_sql(con=engine.connect(),name='Excel_Current_version',if_exists='replace',index=False,chunksize=1000 )
+        print("Successfully loaded Master_backup and Excel_Current_version backup")
+        print("editable_tracker failed !!!!!!")
+        print("close the editable_tracker excel !!!!!!")
+
+    finally:
+        print("Data updated successfully")
+
