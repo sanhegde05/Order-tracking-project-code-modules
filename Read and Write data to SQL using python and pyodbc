@@ -1,0 +1,38 @@
+'''
+This is helpful in reading the SQL tables using SQL query and save that data to any Dataframe.
+Also we can write the SQL tables also using python
+'''
+
+	
+
+import urllib
+import pyodbc
+from urllib.parse import urlparse
+from sqlalchemy import create_engine
+from sqlalchemy import *
+import psutil
+import shutil
+
+DF=pd.DataFrame()
+
+
+#-------------1st method for reading SQL table and save in Dataframe DF
+params = urllib.parse.quote_plus(r'DRIVER={SQL Server Native Client 11.0};SERVER=<Server_name>;DATABASE=<database_name>;Trusted_Connection=yes')
+conn_str = 'mssql+pyodbc:///?odbc_connect={}'.format(params)
+engine = create_engine(conn_str, fast_executemany=True)
+DF= pd.read_sql('<your SQL query>', conn_str)        #reading from the attachment table  (mostly SELECT STATEMENTS)
+
+
+#-------------2nd method for reading SQL table and save in Dataframe DF
+conn_str = pyodbc.connect("DRIVER={SQL Server Native Client 11.0};"
+                      "Server=<server_name>;"
+                      "Database=<database_name>;"
+                      "UID=<usernameme>;"
+                      "PWD=<password>;")
+DF = pd.read_sql(<your SQL query>, conn_str)
+
+
+
+# Uploading the dataframe DF to SQL table
+DF.to_sql(con=engine.connect(),name=<table_name>,if_exists='append',index=False,chunksize=1000)
+                                                 #if 'if_exists' = append, then the Dataframe DF will be appended to table, or if it is replace, entire table will be replace by the DF                      
