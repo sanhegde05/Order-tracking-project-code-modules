@@ -1,0 +1,25 @@
+"""
+This reads an Excel file and reads the sheet named "Sheet1", starts reading from the 16th row (excluding headers- We should change this based on our requirement" and only taking 
+columns B and D. It saves this dataframe to a new Excel file "Calculator.xlsx" after few simple operations, 
+"""
+
+filename="<path of the excel file>"      # c:/users/abc/downloads/test.xlsx
+
+try:
+	DF = pd.read_excel(filename, sheet_name="Sheet1",header=17, usecols='J:P')    #it reads sheet1 and columns J to P, based on requirement we can change the values
+	#some basic actions on the dataframe for cleaning and transformation
+  #...
+  #...
+
+	DF.dropna(axis=0,inplace=True)
+	DF.drop_duplicates(inplace=True)
+    DF['Column1']=round((DF[DF["Column2"]=="<some value>"]).iloc[0,2],2)    #rounding off column2 to 2 positions and saving it to column1 of the the data frame DF	
+	DF['column3']=DF['column4']+DF['column5']     #create column3 using column4 and 5
+	DF.dropna(subset=['column7'],axis=0,inplace=True)      #deleting Null value rows of column7 from the dataframe
+	#DF=pd.concat([DF, DF1], axis=0)    #to append 2 dataframes
+	#--------------------------------
+	DF.to_excel("<new excel name>.xlsx")
+	
+except Exception as e:
+	print("Error while reading and writing the excel: " + str(e))
+	 
