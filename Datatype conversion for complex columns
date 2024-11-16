@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+#converting datatypes to float
+#column1 has float and as well as string values, we need to keep the string datas as it is and need to convert the other values to float
+data_frame['Column1']=data_frame['Column1'].astype(str)     
+data_frame['Column1'] = data_frame['Column1'].apply(lambda x: float(x) if (re.match(r'(\d\d\d)', x)) else x)
+
+#if you want to make all the values of a particular column as negative
+#data_frame['Column1'] *= -1
+
+
+#converting datatypes to Integer
+#column 2 has integer values as well as float (which can have .00) we need to keep it in integer format, keeping the strings present as it is
+data_frame['Column2'] = data_frame['Column2'].astype(str)
+data_frame['Column2']=data_frame['Column2']['Qty (Systems)'].fillna("NA")
+data_frame['Column2']= list(map(lambda x: re.sub(r'[.]\d\d?','',x),data_frame['Column2']))                   #to remove .0 or .00 from the column2
+data_frame['Column2'] = data_frame['Column2'].apply(lambda x: int(x) if (re.match(r'(\d\d\d)',x) and re.match(r'(?![ / ])',x) ) else x)    #column 2 m
+
+
+#converting datatypes to the datetime format
+#column2 has date as well as some texts in between, we wanted to keep the text cells as it is, but to change the other as datetime formats
+convert_date = lambda x: pd.to_datetime(x, errors='coerce', format='%Y-%m-%d') if '-' in str(x) else x        #first format to convert is: 2022-12-31
+convert_date2 = lambda x: pd.to_datetime(x, errors='coerce', format='%m/%d/%Y') if '/' in str(x) else x	      #next format to convert is: 12/31/2022
+
+data_frame['Column3'] = data_frame['Column3'].astype(str)
+data_frame['Column3'] = list(map(lambda x: re.sub(r'N[/]a','NA',x),data_frame['Column3']))                    #convert_date2 will can give error since it tries to convert 'N/a' also to date, so removing / values present
+data_frame['Column3'] = ASA_Main_Edits_sqldata_frame['Column3'].apply(convert_date)
+data_frame['Column3'] = data_frame['Column3'].apply(convert_date2)
+
+
+
+
+
+
+
+#if we can replace the error values to none, use below code:
+#if we use this, the columns will be converted to int/float and to datetime, however the cells having other formats which can not be converted will be replaced and the data will be lost
+#to convert int/float
+data_frame['Column4']=data_frame['Column4'].astype(str)
+data_frame['Column4'] = pd.to_datetime(data_frame['Column4'], errors='coerce')
+
+#to convert datetime
+data_frame['Column5']=data_frame['Column5'].astype(str)
+data_frame['Column5'] = to_numeric(data_frame['Column5'], errors='coerce')
