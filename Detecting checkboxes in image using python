@@ -1,0 +1,81 @@
+"""
+this script takes the page indexed from pdf and scans for the checkbox and based on ticked or not, the values next to checkbox will be printed if found
+"""
+
+import pandas as pd
+import fitz
+import easyocr
+from PIL import Image 
+
+#a and b values to be changed based on the clarity of the pdf..(try with other values if you could not find the checkboxes from this)  
+a=0.1
+b=3
+pg_no_txtbx=3    #pg_no_txtbx is the page index of the pdf, where the textbox is present
+
+
+#checkboxes in pg_no
+pdffile= "<filepath for the pdf to be scanned>"
+imgtxt=""
+doc = fitz.open(pdffile)
+zoom = 4
+mat = fitz.Matrix(zoom, zoom)
+count = 0     # Count variable is to get the number of pages in the pdf
+val = f"page.png"
+page = doc.load_page(pg_no_txtbx)
+pix = page.get_pixmap(matrix=mat)
+pix.save(val)		
+doc.close()
+img = cv2.imread(val, cv2.IMREAD_GRAYSCALE)            #it is the page saved during pdf to text extract 
+type(img)
+_, threshold = cv2.threshold(img, 200, 255, cv2.THRESH_BINARY_INV)
+contours, _ = cv2.findContours(threshold, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+font = cv2.FONT_HERSHEY_COMPLEX
+document_height =  img.shape[0]
+document_width =  img.shape[1]
+
+xco=0
+yco=0    
+for cnt in contours:
+	approx = cv2.approxPolyDP(cnt, a*cv2.arcLength(cnt, True), True)       #here "a" is a variable for contours value
+	coords = approx.ravel()
+	x = coords[0]
+	y = coords[1]
+	if len(approx) == 4:           #If quadrilateral
+		feature_height, feature_width = (coords[5] - coords[1]), (coords[4] - coords[0])     #If the size of the quadrilateral found is significant (e.g. not hidden inside text)
+		if feature_width > float(document_width)/100 and feature_height > float(document_width)/100:    #If a square (± 5 pixels)
+			if abs(feature_height - feature_width) < 3.5:
+				crop_img = img[coords[1]:coords[1] + feature_height, coords[0]:coords[0] + feature_width]
+				_, crop_thresh = cv2.threshold(crop_img, 127, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+				total = crop_img.shape[0] * crop_img.shape[1]
+				count_black = total - cv2.countNonZero(crop_thresh)
+
+				if count_black > float(total)/b:              #here "b" is a variable for checking percentage of filled for a textbox
+					cv2.drawContours(img, [approx], 0, (0), 2)
+					cv2.putText(img, "Filled", (x, y), font, 0.5, (0))    #"Filled" text will be coming near to checkbox as output
+				else:
+					cv2.drawContours(img, [approx], 0, (0), 2)
+#                    cv2.putText(img, "Empty", (x, y), font, 0.5, (0))    #"Empty" text will be coming near to checkbox as output if it is unchecked
+				xco=x
+				yco=y
+     plt_img(img)
+	 
+	 
+#----------- if you want to read the text next to the checkbox
+if xco!=0 or yco!=0:    
+	img1234 = Image.open(val) 
+	left,top,right,bottom = xco-10,yco-10,xco+1000,yco+70   #based on the requirement of how much text to be captured, change the co-ordinate values
+	img_res = img1234.crop((left, top, right, bottom))
+	img_res.save(open(f"imagecrop1.png", "wb"))
+	IMAGE_PATH = "imagecrop1.png"
+	reader1 = easyocr.Reader(['en'])
+	result = reader1.readtext(IMAGE_PATH)
+	os.remove(val)
+	imagetext=""
+	for i in range (len(result)):
+		imagetext+=result[i][1]+" "
+	imgtxt13 =''.join(imagetext)	
+	print("This is text next to the checkbox: "+imgtxt13)
+else :
+	print('No checkmarks found for this a and b values, Please check with different a and b values!!!')
+
+
